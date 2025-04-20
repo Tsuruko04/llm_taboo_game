@@ -1,0 +1,5 @@
+agents:
+  attacker: deepseek-v3
+  defender: deepseek-v3
+
+parse_model: deepseek-v3
