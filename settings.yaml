@@ -1,5 +1,5 @@
 agents:
-  attacker: deepseek-v3
-  defender: deepseek-v3
+  attacker: llama3.1-8b
+  defender: llama3.1-8b
 
 parse_model: deepseek-v3

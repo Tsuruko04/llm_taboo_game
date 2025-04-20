@@ -22,6 +22,8 @@ class Player:
         self.model = model
         self.experience =  None
         
+    def __str__(self):
+        return f"{self.model} {"w/" if self.experience else "w/o"} exp"
     def generate_response(self, query):
         raw_response = utils.generate_response([{"role": "user", "content": query}], model=self.model)
         print("THOUGHT:", raw_response)

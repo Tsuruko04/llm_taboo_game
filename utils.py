@@ -1,67 +1,121 @@
 
 import random
+
+from openai import OpenAI
+from vllm import LLM, SamplingParams
 import httpx
 import os
 
-from openai import OpenAI
-OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL") 
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-FASTCHAT_BASE_URL = "http://0.0.0.0:21003/v1"
+# 全局token统计
 prompt_token = 0
 completion_token = 0
-MAX_RETRIES = 3
-def get_total_usage():
-    global prompt_token, completion_token
-    return prompt_token, completion_token
+
+# 环境变量配置
+OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL") 
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+MODEL_PATHS = {
+    "llama3.1-8b": "/yeesuanAI08/LLM/Meta-Llama-3.1-8B-Instruct",
+    "qwen2.5-7b-instruct": "/yeesuanAI08/LLM/Qwen2.5-7B-Instruct"
+}
+
+# 初始化客户端
+# OpenAI客户端（用于云端API）
 openai_client = OpenAI(
-    base_url=OPENAI_BASE_URL if OPENAI_BASE_URL else "https://api.openai.com/v1" ,
-    api_key=OPENAI_API_KEY if OPENAI_API_KEY else "EMPTY",
+    base_url=OPENAI_BASE_URL or "https://api.openai.com/v1",
+    api_key=OPENAI_API_KEY or "EMPTY",
     http_client=httpx.Client(
-        base_url=OPENAI_BASE_URL if OPENAI_BASE_URL else "https://api.openai.com/v1",
         follow_redirects=True,
+    )
+)
+
+# vLLM客户端（用于本地模型）
+local_models = {
+    "llama3.1-8b": LLM(
+        model=MODEL_PATHS["llama3.1-8b"],
+        trust_remote_code=True
     ),
-)
-fastchat_client = OpenAI(
-    base_url=FASTCHAT_BASE_URL,
-    api_key="EMPTY",  # FastChat不需要验证的API密钥
-    timeout = 60
-)
-def generate_response(messages, model="gpt-4o"):
-    global prompt_token, completion_token
-    retried = 0
-    # print(f"使用模型: {model}")
+    # "qwen2.5-7b-instruct": LLM(
+    #     model=MODEL_PATHS["qwen2.5-7b-instruct"],
+    #     tensor_parallel_size=1,
+    #     trust_remote_code=True
+    # )
+}
+
+def build_prompt(messages: list, model_type: str) -> str:
+    """构建不同模型的prompt模板"""
+    if "llama3" in model_type:
+        prompt = "<|begin_of_text|>"
+        for msg in messages:
+            role = msg["role"]
+            content = msg["content"]
+            prompt += f"<|start_header_id|>{role}<|end_header_id|>\n\n{content}<|eot_id|>"
+        prompt += "<|start_header_id|>assistant<|end_header_id|>\n\n"
+        return prompt
     
-    while retried < MAX_RETRIES:
-        if retried > 0:
-            print("Connection Timout Retries:",retried)
-        try:
-            if model.lower().startswith("meta"):
-                # 使用FastChat客户端
-                response = fastchat_client.chat.completions.create(
-                    model=model,  # 确保与FastChat注册的模型名称匹配
-                    messages=messages,
-                    temperature=0,
-                )
-            else:
-                # 使用OpenAI客户端
+    if "qwen" in model_type:
+        prompt = ""
+        for msg in messages:
+            prompt += f"<|im_start|>{msg['role']}\n{msg['content']}<|im_end|>\n"
+        prompt += "<|im_start|>assistant\n"
+        return prompt
+    
+    # 默认使用OpenAI格式
+    return "\n".join([f"{m['role']}: {m['content']}" for m in messages])
+
+def generate_response(messages: list, model: str = "gpt-4") -> str:
+    global prompt_token, completion_token
+    
+    # 判断使用本地模型还是API
+    if model in local_models:
+        # 使用vLLM本地推理
+        llm = local_models[model]
+        model_type = "llama3" if "llama3" in model.lower() else "qwen"
+        
+        prompt = build_prompt(messages, model_type)
+        sampling_params = SamplingParams(
+            temperature=0.3,
+            max_tokens=1024,
+            stop=["<|eot_id|>", "<|im_end|>"]
+        )
+        
+        outputs = llm.generate(prompt, sampling_params)
+        response = outputs[0].outputs[0].text.strip()
+        
+        # 统计token
+        prompt_token += len(outputs[0].prompt_token_ids)
+        completion_token += len(outputs[0].outputs[0].token_ids)
+        
+        return response
+    else:
+        # 调用OpenAI API
+        retries = 0
+        MAX_RETRIES = 3
+        
+        while retries < MAX_RETRIES:
+            try:
                 response = openai_client.chat.completions.create(
                     model=model,
                     messages=messages,
-                    temperature=0,
+                    temperature=0.3
                 )
-            try:
-                prompt_token += response.usage.prompt_tokens
-                completion_token += response.usage.completion_tokens
-            except AttributeError:
-                print("Warning: API响应中缺少usage信息，无法统计Token用量")
+                
+                # 统计token
+                if hasattr(response, "usage"):
+                    prompt_token += response.usage.prompt_tokens
+                    completion_token += response.usage.completion_tokens
+                
+                return response.choices[0].message.content
+            except Exception as e:
+                print(f"API调用失败: {str(e)}")
+                retries += 1
+                if retries >= MAX_RETRIES:
+                    raise ConnectionError("超过最大重试次数")
+                
 
-            return response.choices[0].message.content
-        except Exception as e:
-            print(e)
-            retried+=1
 
-    raise ConnectionError
-
+def get_total_usage():
+    global prompt_token, completion_token
+    return prompt_token, completion_token
 
 GAME_RULE_PROMPTS=[
 '''Play the game of Adversarial Taboo. In this game, there are two players, an attacker and a defender.
