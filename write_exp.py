@@ -1,7 +1,7 @@
 import os
 import utils
-NUM_EXP = 5
-ROLE = "defender"
+NUM_EXP = 10
+ROLE = "attacker"
 model = "llama3.1-8b"
 sys_prompt = """
 You are an experienced party game player.
@@ -20,10 +20,10 @@ Given several game logs, you need to read them carefully and conclude strategies
 """
 
 gamelogs = ""
-for log in os.listdir("./log")[:5]:
+for log in os.listdir("./log")[:NUM_EXP]:
     with open(f"./log/{log}","r") as f:
         gamelogs+=(f.read()+"\n")
-with open(f"./exp/{model}_{NUM_EXP}","w+") as f:
+with open(f"./exp/{model}_{ROLE}_{NUM_EXP}","w+") as f:
     exp = utils.generate_response([{'role':"system","content":sys_prompt.format(role=ROLE,gamelogs=gamelogs)}],model=model)
     print(exp)
     f.write(exp)

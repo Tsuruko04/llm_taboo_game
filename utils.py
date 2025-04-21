@@ -40,6 +40,9 @@ local_models = {
     #     trust_remote_code=True
     # )
 }
+api_models = {
+    "llama3.1-8b_api":"llama3.1-8b",    
+}
 
 def build_prompt(messages: list, model_type: str) -> str:
     """构建不同模型的prompt模板"""
@@ -74,7 +77,7 @@ def generate_response(messages: list, model: str = "gpt-4") -> str:
         prompt = build_prompt(messages, model_type)
         sampling_params = SamplingParams(
             temperature=0.3,
-            max_tokens=1024,
+            max_tokens=4096,
             stop=["<|eot_id|>", "<|im_end|>"]
         )
         
@@ -93,11 +96,13 @@ def generate_response(messages: list, model: str = "gpt-4") -> str:
         
         while retries < MAX_RETRIES:
             try:
+                if model.endswith("api"):
+                    model = api_models[model]
                 response = openai_client.chat.completions.create(
                     model=model,
                     messages=messages,
-                    temperature=0.3,
-                    max_tokens=4096
+                    temperature=0,
+                    max_tokens=1024
                 )
                 
                 # 统计token
@@ -125,7 +130,8 @@ At the beginning, the attacker is assigned a target word, with which the defende
 
 At the same time, the defender tries to figure out the target word. If the defender identifies the target word, he can say "I know the word! It is `target word`!". Then the defender wins. Remember, the defender can only guess the word once, otherwise he will directly lose the game.
 
-The game has {max_turns} turns. if nobody wins during {max_turns} turns, there is a tie.
+The game has {max_turns} turns. if nobody wins during {max_turns} turns, there is a tie. You can play a game that involves guessing a word that the other player is thinking of. Please enjoy the game!
+
 ''',
 '''
 Engage in the strategic contest of Adversarial Taboo, a game involving two participants: one assumes the role of the attacker, while the other is the defender.

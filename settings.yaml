@@ -3,5 +3,7 @@ agents:
   defender: llama3.1-8b
 experience_path:
   attacker: None
-  defender: ./exp/llama3.1-8b_5
+  # defender: None
+  # attacker: ./exp/llama3.1-8b_attacker_dc
+  defender: ./exp/llama3.1-8b_defender_dc
 parse_model: deepseek-v3
