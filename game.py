@@ -1,4 +1,4 @@
-import yaml
+import os
 import utils
 import enum
 import time
@@ -19,8 +19,8 @@ class TabooGame:
         agents = settings["agents"]
         self.exp_path = settings["experience_path"]
         self.players = {
-            "attacker": Player(model=agents["attacker"],exp_path=self.exp_path["attacker"]),
-            "defender": Player(model=agents["defender"],exp_path=self.exp_path["defender"])
+            "attacker": Player(model=agents["attacker"],exp_path=self.exp_path["attacker"],parse_model=settings["parse_model"]),
+            "defender": Player(model=agents["defender"],exp_path=self.exp_path["defender"],parse_model=settings["parse_model"])
         }
         print(
             f"""
@@ -72,10 +72,19 @@ class TabooGame:
         self.game_result = GameResult.TIED
         return GameResult.TIED
             
-    def log(self):
+    def log(self, dir="log"):
+        if not os.path.exists(dir):
+            os.mkdir(dir)
         history_str = ""
         for i, message in enumerate(self.history):
             history_str += "\n  - {}: {}".format(message['role'], message['content'])
+        with open(f"{dir}/game_history_{time.time()}.txt","w+") as f:
+            f.write(
+                f"Attacker: {self.players['attacker']}\nDefender: {self.players['defender']}\nTarget Word: {self.target_word}\nMax Turns: {self.max_turns}\n---"
+            )
+            f.write(history_str+"\n")
+            f.write(str(self.game_result))
+            f.close()
         for role, player in self.players.items():
             if player.use_dynamic_cheatsheet:
                 if self.game_result == GameResult.ATTACKER_WINS:
@@ -89,12 +98,15 @@ class TabooGame:
                     # import pdb
                     # pdb.set_trace()
                     f.write(exp)       
-        with open(f"./log/game_history_{time.time()}.txt","w+") as f:
-            f.write(
-                f"Attacker: {self.players['attacker']}\nDefender: {self.players['defender']}\nTarget Word: {self.target_word}\nMax Turns: {self.max_turns}\n---"
-            )
-            f.write(history_str+"\n")
-            f.write(str(self.game_result))
-            f.close()
+            elif player.experience is not None:
+                exp = "Here are several game experiences:"
+                for log in os.listdir(dir)[-int(player.num_exp_round):]:
+                    with open(dir+"/"+log, "r") as f:
+                        exp+=("\n"+f.read())
+                with open(self.exp_path[role]+".txt","w+",encoding="utf-8") as f:
+                    f.write(exp)
+                     
+                
+        
        
                 

@@ -1,9 +1,6 @@
 import utils
-import yaml
 import re
 import os
-PARSE_MODEL = yaml.safe_load(open("./settings.yaml", "r"))["parse_model"]
-print("PARSE_MODEL:",PARSE_MODEL)
 
 parse_query = """
     # Background:
@@ -38,9 +35,10 @@ parse_query = """
     # Your Resonpse:
 """
 class Player:
-    def __init__(self, model="gpt-4o",exp_path="none"):
+    def __init__(self, model="gpt-4o",exp_path="none",parse_model='deepseek-v3'):
         self.model = model
         self.exp_path = exp_path
+        self.parse_model = parse_model
         self.use_dynamic_cheatsheet = False
         if "none" in exp_path.lower():
             self.experience =  None
@@ -75,12 +73,16 @@ class Player:
         response = self._parse_response(raw_response)
         return response
     def _parse_response(self, response:str):
+        return  utils.generate_response(
+            [{"role": "user", "content": parse_query.format(response=response)}],
+            model=self.parse_model
+        )
         pattern = r'<answer>(.*?)</answer>'
         matches = re.findall(pattern, response, flags=re.DOTALL)
         if not matches or len(matches)>1:
              return  utils.generate_response(
             [{"role": "user", "content": parse_query.format(response=response)}],
-            model=PARSE_MODEL
+            model=self.parse_model
         )
         elif len(matches)==1:
             return matches[0].strip()
