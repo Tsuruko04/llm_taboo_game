@@ -1,5 +1,6 @@
 import utils
 import yaml
+import re
 import os
 PARSE_MODEL = yaml.safe_load(open("./settings.yaml", "r"))["parse_model"]
 print("PARSE_MODEL:",PARSE_MODEL)
@@ -46,34 +47,44 @@ class Player:
         else:
             if exp_path.endswith("dc"):
                 self.use_dynamic_cheatsheet = True
+            if not os.path.exists(exp_path+".txt"):
+                with open(exp_path+".txt",'w+') as f:
+                    f.close()
             with open(exp_path+".txt",'r') as f:
                 self.experience = f.read()
-                print(self.experience)
+                print("Initialized with experience:",self.experience)
                 self.num_exp_round = exp_path.split("_")[-1]
                 f.close()
-            if self.use_dynamic_cheatsheet:
-                with open("./generator.txt",'r') as f:
-                    self.generator_prompt = f.read()
-                    f.close()
-                with open("reflector.txt","r") as f:  
-                    self.reflector_prompt = f.read()
-                    f.close()
+        with open("./prompt/generator.txt",'r') as f:
+            self.generator_prompt = f.read()
+            f.close()
+        with open("./prompt/reflector.txt","r") as f:  
+            self.reflector_prompt = f.read()
+            f.close()
     def __str__(self):
         return f"{self.model} {'w/' if self.experience is not None else 'w/o'} exp{'_'+self.num_exp_round if self.experience is not None else ''}"
     def generate_response(self, query):
         content = query
-        if self.use_dynamic_cheatsheet:
+        if self.experience is not None:
             content = self.generator_prompt.replace("[[CHEATSHEET]]",self.experience)
-            content = content.replace("[[QUESTION]]",query)
+        else:
+            content = self.generator_prompt.replace("[[CHEATSHEET]]","NO CHEATSHEET")
+        content = content.replace("[[QUESTION]]",query)
         raw_response = utils.generate_response([{"role": "user", "content": content}], model=self.model)
         print("THOUGHT:", raw_response)
         response = self._parse_response(raw_response)
         return response
-    def _parse_response(self, response):
-        return utils.generate_response(
+    def _parse_response(self, response:str):
+        pattern = r'<answer>(.*?)</answer>'
+        matches = re.findall(pattern, response, flags=re.DOTALL)
+        if not matches or len(matches)>1:
+             return  utils.generate_response(
             [{"role": "user", "content": parse_query.format(response=response)}],
             model=PARSE_MODEL
         )
+        elif len(matches)==1:
+            return matches[0].strip()
+       
         
     def reflect(self, history, feedback):
         content = self.reflector_prompt.replace("[[PREVIOUS_CHEATSHEET]]",self.experience)\

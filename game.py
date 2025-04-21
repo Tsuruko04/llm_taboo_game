@@ -10,13 +10,12 @@ class GameResult(enum.Enum):
     DEFENDER_WINS = 2
     TIED = 3
 class TabooGame:
-    def __init__(self, target_word, max_turns=5):
+    def __init__(self, target_word, settings,max_turns=5):
         self.target_word = target_word
         self.max_turns = max_turns
         self.turns = 0
         self.history = []
         self.game_result = GameResult.NONE
-        settings = yaml.safe_load(open("./settings.yaml"))
         agents = settings["agents"]
         self.exp_path = settings["experience_path"]
         self.players = {
@@ -39,7 +38,7 @@ class TabooGame:
         while self.turns < self.max_turns:
             print(f"----------TURN {self.turns + 1}/{self.max_turns}----------")
 
-            query = utils.convert_game_history_to_query(self.history, self.target_word, self.max_turns, attacker.experience)
+            query = utils.convert_game_history_to_query(self.history, self.target_word, self.max_turns)
             response = attacker.generate_response(query)
             print(f"ATTACKER SPOKE: {response}")
             self.history.append({"role":"attacker", "content":response})
@@ -48,7 +47,7 @@ class TabooGame:
                 print("DEFENDER WINS")
                 self.game_result = GameResult.DEFENDER_WINS
                 return GameResult.DEFENDER_WINS
-            query = utils.convert_game_history_to_query(self.history, self.target_word, self.max_turns, defender.experience)
+            query = utils.convert_game_history_to_query(self.history, self.target_word, self.max_turns)
             response = defender.generate_response(query)
             print(f"DEFENDER SPOKE: {response}")
             self.history.append({"role":"defender", "content":response})

@@ -210,7 +210,7 @@ PLAYER_INSTRUCT_PROMPTS = {
 }
 
 
-def convert_game_history_to_query(history, target_word, max_turns=5, exp=None):
+def convert_game_history_to_query(history, target_word, max_turns=5):
     """
     Converts the game history into a query string for the next player in the Adversarial Taboo game.
 
@@ -241,8 +241,6 @@ def convert_game_history_to_query(history, target_word, max_turns=5, exp=None):
             next_player = "defender"
         else:
             next_player = "attacker"
-    if exp:
-        query+=f"\n### Experience: {exp}\n"
     query += INSTRUCT_PROMPTS[next_player].format(target_word=target_word)
     return query
 
