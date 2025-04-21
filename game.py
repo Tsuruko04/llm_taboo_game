@@ -17,9 +17,10 @@ class TabooGame:
         self.game_result = GameResult.NONE
         settings = yaml.safe_load(open("./settings.yaml"))
         agents = settings["agents"]
+        exp_path = settings["experience_path"]
         self.players = {
-            "attacker": Player(model=agents["attacker"]),
-            "defender": Player(model=agents["defender"])
+            "attacker": Player(model=agents["attacker"],exp_path=exp_path["attacker"]),
+            "defender": Player(model=agents["defender"],exp_path=exp_path["defender"])
         }
         print(
             f"""
@@ -32,14 +33,21 @@ class TabooGame:
         )
     
     def run(self):
+        attacker = self.players["attacker"]
+        defender = self.players["defender"]
         while self.turns < self.max_turns:
             print(f"----------TURN {self.turns + 1}/{self.max_turns}----------")
-            query = utils.convert_game_history_to_query(self.history, self.target_word, self.max_turns)
-            response = self.players["attacker"].generate_response(query)
+
+            query = utils.convert_game_history_to_query(self.history, self.target_word, self.max_turns, attacker.experience)
+            response = attacker.generate_response(query)
             print(f"ATTACKER SPOKE: {response}")
             self.history.append({"role":"attacker", "content":response})
-            query = utils.convert_game_history_to_query(self.history, self.target_word, self.max_turns)
-            response = self.players["defender"].generate_response(query)
+            if self.target_word in response.lower():
+                print("DEFENDER WINS")
+                self.game_result = GameResult.DEFENDER_WINS
+                return GameResult.DEFENDER_WINS
+            query = utils.convert_game_history_to_query(self.history, self.target_word, self.max_turns, defender.experience)
+            response = defender.generate_response(query)
             print(f"DEFENDER SPOKE: {response}")
             self.history.append({"role":"defender", "content":response})
             if "i know the word" in response.lower():
@@ -65,17 +73,10 @@ class TabooGame:
     def log(self):
         with open(f"./log/game_history_{time.time()}.txt","w+") as f:
             f.write(
-                f"""
-                Attacker: {self.players["attacker"]}\n
-                Defender: {self.players["defender"]}\n
-                Target Word: {self.target_word}\n
-                Max Turns: {self.max_turns}\n
-                ---\n
-                """
+                f"Attacker: {self.players['attacker']}\nDefender: {self.players['defender']}\nTarget Word: {self.target_word}\nMax Turns: {self.max_turns}\n---"
             )
             history_str = ""
             for i, message in enumerate(self.history):
                 history_str += "\n  - {}: {}".format(message['role'], message['content'])
-            f.write(history_str)
+            f.write(history_str+"\n")
             f.write(str(self.game_result))
-            

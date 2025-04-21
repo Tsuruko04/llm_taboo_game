@@ -18,12 +18,17 @@ parse_query = """
     Please do not include any other information, just respond with the agent's decision as a player.
 """
 class Player:
-    def __init__(self, model="gpt-4o"):
+    def __init__(self, model="gpt-4o",exp_path="none"):
         self.model = model
-        self.experience =  None
+        if "none" in exp_path.lower():
+            self.experience =  None
+        else:
+            with open(exp_path) as f:
+                self.experience = f.read()
+                self.num_exp_round = exp_path.split("_")[-1]
         
     def __str__(self):
-        return f"{self.model} {"w/" if self.experience else "w/o"} exp"
+        return f"{self.model} {'w/' if self.experience else 'w/o'} exp {self.num_exp_round if self.experience else ''}"
     def generate_response(self, query):
         raw_response = utils.generate_response([{"role": "user", "content": query}], model=self.model)
         print("THOUGHT:", raw_response)
@@ -34,3 +39,4 @@ class Player:
             [{"role": "user", "content": parse_query.format(response=response)}],
             model=PARSE_MODEL
         )
+        

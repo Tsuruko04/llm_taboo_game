@@ -96,7 +96,8 @@ def generate_response(messages: list, model: str = "gpt-4") -> str:
                 response = openai_client.chat.completions.create(
                     model=model,
                     messages=messages,
-                    temperature=0.3
+                    temperature=0.3,
+                    max_tokens=4096
                 )
                 
                 # 统计token
@@ -203,7 +204,7 @@ PLAYER_INSTRUCT_PROMPTS = {
 }
 
 
-def convert_game_history_to_query(history, target_word, max_turns=5):
+def convert_game_history_to_query(history, target_word, max_turns=5, exp=None):
     """
     Converts the game history into a query string for the next player in the Adversarial Taboo game.
 
@@ -234,7 +235,8 @@ def convert_game_history_to_query(history, target_word, max_turns=5):
             next_player = "defender"
         else:
             next_player = "attacker"
-            
+    if exp:
+        query+=f"\n### Experience: {exp}\n"
     query += INSTRUCT_PROMPTS[next_player].format(target_word=target_word)
     return query
 
